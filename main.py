@@ -22,7 +22,9 @@ octave_num = 4
 octave_scale = 1.4
 learning_rate = 1.5
 tile_size = 512
-noise = np.random.uniform(size=(224, 224, 3)) + 100.0
+rng = np.random.RandomState(0)
+
+noise = rng.uniform(size=(224, 224, 3)) + 100.0
 
 
 def define_args():
@@ -101,7 +103,7 @@ def deep_dream(model, output_path, input_image=noise):
     def cal_gradient(image, gradient):
         """cal gradient"""
         # generate offset and shift to smooth tile edge
-        shift_x, shift_y = np.random.randint(tile_size, size=2)
+        shift_x, shift_y = rng.randint(tile_size, size=2)
         image_shift = np.roll(np.roll(image, shift_x, 1), shift_y, 0)
         total_gradient = np.zeros_like(image)
         # calculate gradient for each region
@@ -123,6 +125,8 @@ def deep_dream(model, output_path, input_image=noise):
             image += g_ * (learning_rate / (np.abs(g_).mean() + 1e-7))  # large learning rate for small g_
 
     cv2.imwrite(output_path, image)
+    cv2.imshow('result', image / 255)
+    cv2.waitKey(0)
 
 
 if __name__ == "__main__":
