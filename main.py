@@ -16,15 +16,15 @@ import cv2
 # parameter
 model_name = "tensorflow_inception_graph.pb"
 imagenet_mean = 117.0
-layer = 'mixed4c'
+layer_name = 'mixed5b'
 iter_num = 50
-octave_num = 4
+octave_num = 6
 octave_scale = 1.4
-learning_rate = 1.5
+learning_rate = 2
 tile_size = 512
-rng = np.random.RandomState(0)
+noise = np.random.RandomState(1).uniform(size=(224, 224, 3)) + 100.0
 
-noise = rng.uniform(size=(224, 224, 3)) + 100.0
+rng = np.random.RandomState(2)
 
 
 def define_args():
@@ -63,8 +63,10 @@ def deep_dream(model, output_path, input_image=noise):
     X2 = tf.expand_dims(X - imagenet_mean, 0)
     tf.import_graph_def(graph_def, {"input": X2})
 
+    layer = graph.get_tensor_by_name("import/%s:0" % layer_name)
+    print(f'Layer {layer_name}, shape {layer.shape}')
     # L2 and gradient
-    loss = tf.reduce_mean(tf.square(graph.get_tensor_by_name("import/%s:0" % layer)))
+    loss = tf.reduce_mean(tf.square(layer))
     gradient = tf.gradients(loss, X)[0]
 
     image = input_image
@@ -113,6 +115,10 @@ def deep_dream(model, output_path, input_image=noise):
                 total_gradient[y:y + tile_size, x:x + tile_size] = sess.run(gradient, {X: region})
         return np.roll(np.roll(total_gradient, -shift_x, 1), -shift_y, 0)
 
+    def cal_gradient2(image, gradient):
+        total_gradient = sess.run(gradient, {X: image})
+        return total_gradient
+
     for i in range(octave_num):
         print("octave num %s/%s..." % (i+1, octave_num))
         if i > 0:
@@ -121,11 +127,12 @@ def deep_dream(model, output_path, input_image=noise):
             image = resize(image, diff.shape[:2]) + diff
         for j in range(iter_num):
             # gradient ascent
-            g_ = cal_gradient(image, gradient)
+            g_ = cal_gradient2(image, gradient)
             image += g_ * (learning_rate / (np.abs(g_).mean() + 1e-7))  # large learning rate for small g_
+            cv2.imshow('result', image / 255)
+            cv2.waitKey(1)
 
     cv2.imwrite(output_path, image)
-    cv2.imshow('result', image / 255)
     cv2.waitKey(0)
 
 
